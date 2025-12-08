@@ -1,11 +1,9 @@
 import os
-import shutil
-from collections.abc import Callable
+from typing import Callable, Optional
 
 import numpy as np
 
 from tonic.dataset import Dataset
-from tonic.download_utils import extract_archive
 
 
 class POKERDVS(Dataset):
@@ -33,13 +31,14 @@ class POKERDVS(Dataset):
                                          labels at the same time.
     """
 
+    base_url = "https://github.com/neuromorphs/tonic/raw/refs/heads/develop/tonic/datasets/"
     train_filename = "pips_train.tar.gz"
     test_filename = "pips_test.tar.gz"
-    train_md5 = "412bcfb96826e4fcb290558e8c150aae"
-    test_md5 = "eef2bf7d0d3defae89a6fa98b07c17af"
+    train_url = base_url + train_filename
+    test_url = base_url + test_filename
 
     classes = ["cl", "he", "di", "sp"]
-    int_classes = dict(zip(classes, range(4), strict=False))
+    int_classes = dict(zip(classes, range(4)))
     sensor_size = (35, 35, 2)
     dtype = np.dtype([("t", int), ("x", int), ("y", int), ("p", int)])
     ordering = dtype.names
@@ -48,9 +47,9 @@ class POKERDVS(Dataset):
         self,
         save_to: str,
         train: bool = True,
-        transform: Callable | None = None,
-        target_transform: Callable | None = None,
-        transforms: Callable | None = None,
+        transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None,
+        transforms: Optional[Callable] = None,
     ):
         super().__init__(
             save_to,
@@ -62,16 +61,16 @@ class POKERDVS(Dataset):
         self.train = train
 
         if train:
-            self.file_md5 = self.train_md5
+            self.url = self.train_url
             self.filename = self.train_filename
             self.folder_name = "pips_train"
         else:
-            self.file_md5 = self.test_md5
+            self.url = self.test_url
             self.filename = self.test_filename
             self.folder_name = "pips_test"
 
         if not self._check_exists():
-            self._copy_and_extract_local_data()
+            self.download()
 
         file_path = os.path.join(self.location_on_system, self.folder_name)
         for path, dirs, files in os.walk(file_path):
@@ -98,30 +97,6 @@ class POKERDVS(Dataset):
 
     def __len__(self):
         return len(self.data)
-
-    def _copy_and_extract_local_data(self):
-        """Copy and extract data from local datasets directory."""
-        # Get the path to the datasets directory
-        datasets_dir = os.path.dirname(os.path.abspath(__file__))
-        source_file = os.path.join(datasets_dir, self.filename)
-
-        if not os.path.exists(source_file):
-            raise FileNotFoundError(
-                f"Local data file {self.filename} not found in {datasets_dir}. "
-                "Please ensure the POKER data files are in the datasets directory."
-            )
-
-        # Copy the file to the target location
-        target_file = os.path.join(self.location_on_system, self.filename)
-        # Ensure the target directory exists
-        os.makedirs(self.location_on_system, exist_ok=True)
-        shutil.copy2(source_file, target_file)
-
-        # Extract the archive
-        extract_archive(target_file, self.location_on_system)
-
-        # Remove the copied archive file to save space
-        os.remove(target_file)
 
     def _check_exists(self):
         return (
